@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caminhão-pipa: níveis</title>
+<style>
+:root{--bg:#f1ece2;--ink:#1d2b33;--mut:#66747c;--agua:#2a8fc7;--ok:#1f7a4d;--bad:#c0392b;--warn:#8a5a00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+main{max-width:900px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.5rem;margin:0 0 4px}
+.mut{color:var(--mut);margin:4px 0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.badge{padding:4px 12px;border-radius:99px;font-weight:600;color:#fff;background:var(--ok)}
+.badge.bad{background:var(--bad)}.badge.old{background:var(--warn)}
+svg{width:100%;height:auto;background:#fff;border-radius:12px;padding:8px}
+table{width:100%;border-collapse:collapse;margin-top:20px;background:#fff;border-radius:12px;overflow:hidden}
+th,td{padding:8px 14px;text-align:left;border-bottom:1px solid #e6e0d3}
+th{background:var(--ink);color:#fff;font-weight:600}
+td.a{font-weight:600}td.a.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+<h1>Caminhão-pipa: nível dos compartimentos</h1>
+<p class="mut" id="hora">Última atualização: --</p>
+<div class="bar"><span class="badge" id="estado">Aguardando dados</span><span class="badge old" id="stale" hidden>Dados desatualizados</span></div>
+<svg id="truck" viewBox="0 0 620 230" role="img" aria-label="Caminhão-pipa com três compartimentos"></svg>
+<table>
+  <thead><tr><th>Recebimento</th><th>Compartimento</th><th>Nível (%)</th><th>Estado</th></tr></thead>
+  <tbody id="hist"><tr><td colspan="4">Carregando...</td></tr></tbody>
+</table>
+</main>
+<script src="config.js"></script>
+<script>
+const LIMITE_S = 30;  // 3x o intervalo de 10 s
+const NOME = {normal:"Normal", baixo:"Nível baixo", transbordo:"Transbordo", vazamento:"Vazamento"};
+const fmt = d => new Date(d).toLocaleString("pt-BR");
+function desenhar(latest){
+  let s = `<rect x="14" y="70" width="104" height="90" rx="10" fill="#c0392b"/>
+    <rect x="30" y="82" width="52" height="36" rx="4" fill="#dff1fa"/>
+    <rect x="118" y="150" width="480" height="12" fill="#444"/>
+    <rect x="124" y="30" width="480" height="124" rx="22" fill="#e9eef1" stroke="#1d2b33" stroke-width="3"/>`;
+  ["c1","c2","c3"].forEach((id,i)=>{
+    const r = latest[id], x = 136+i*154, w = 142, y = 42, h = 100;
+    const nivel = r ? r.value : 0, ruim = r && r.alert !== "normal";
+    const alt = h*nivel/100;
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="#fff" stroke="${ruim?"#c0392b":"#1d2b33"}" stroke-width="${ruim?4:2}" ${r&&r.alert==="vazamento"?'stroke-dasharray="8 5"':""}/>
+      <clipPath id="k${i}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/></clipPath>
+      <rect x="${x}" y="${y+h-alt}" width="${w}" height="${alt}" fill="${ruim?"#d9695c":"#2a8fc7"}" clip-path="url(#k${i})"/>
+      <text x="${x+w/2}" y="${y+h-20}" text-anchor="middle" font-size="26" font-weight="700" fill="#1d2b33" stroke="#fff" stroke-width="4" paint-order="stroke">${r?nivel.toFixed(1)+" %":"--"}</text>
+      <text x="${x+w/2}" y="${y+20}" text-anchor="middle" font-size="13" font-weight="600" fill="#1d2b33" stroke="#fff" stroke-width="3" paint-order="stroke">Compartimento ${i+1}</text>
+      <text x="${x+w/2}" y="${y+38}" text-anchor="middle" font-size="12" font-weight="600" fill="${ruim?"#c0392b":"#1f7a4d"}" stroke="#fff" stroke-width="3" paint-order="stroke">${r?NOME[r.alert]:"Sem dados"}</text>`;
+  });
+  [70,210,500,570].forEach(cx=>{s+=`<circle cx="${cx}" cy="178" r="22" fill="#222"/><circle cx="${cx}" cy="178" r="9" fill="#bbb"/>`});
+  document.getElementById("truck").innerHTML = s;
+}
+async function atualizar(){
+  try{
+    const j = await (await fetch(`${window.API_URL}?device_id=${window.DEVICE_ID}`)).json();
+    const ls = Object.values(j.latest);
+    desenhar(j.latest);
+    if(!ls.length){document.getElementById("hist").innerHTML='<tr><td colspan="4">Nenhuma leitura ainda.</td></tr>';return}
+    const rec = ls.map(l=>new Date(l.received_at)).sort((a,b)=>b-a)[0];
+    const idade = (Date.now()-rec)/1000;
+    const prob = ls.filter(l=>l.alert!=="normal");
+    const e = document.getElementById("estado");
+    const vaz = ls.filter(l=>l.alert==="vazamento");
+    e.textContent = vaz.length ? "Vazamento detectado" : prob.length ? "Alerta de nível" : "Todos os níveis normais";
+    e.className = "badge" + (prob.length ? " bad" : "");
+    document.getElementById("stale").hidden = idade <= LIMITE_S;
+    document.getElementById("hora").textContent = "Última atualização: "+fmt(rec)+" ("+Math.round(idade)+" s atrás)";
+    document.getElementById("hist").innerHTML = j.history.map(h=>
+      `<tr><td>${fmt(h.received_at)}</td><td>${h.compartment.replace("c","")}</td><td>${h.value.toFixed(1)}</td><td class="a ${h.alert!=="normal"?"bad":""}">${NOME[h.alert]}</td></tr>`).join("");
+  }catch(err){document.getElementById("stale").hidden = false}
+}
+desenhar({}); atualizar(); setInterval(atualizar, 5000);
+</script>
+</body>
+</html>
