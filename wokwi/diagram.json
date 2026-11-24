@@ -1,0 +1,29 @@
+{
+  "version": 1, "author": "Caminhao pipa", "editor": "wokwi",
+  "parts": [
+    {"type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0,
+     "attrs": {"env": "micropython-20260406-v1.28.0"}},
+    {"type": "wokwi-hc-sr04", "id": "us1", "top": -120, "left": 240, "attrs": {"distance": "30"}},
+    {"type": "wokwi-hc-sr04", "id": "us2", "top": -120, "left": 400, "attrs": {"distance": "30"}},
+    {"type": "wokwi-hc-sr04", "id": "us3", "top": -120, "left": 560, "attrs": {"distance": "30"}},
+    {"type": "wokwi-led", "id": "led", "top": 200, "left": 270, "attrs": {"color": "red", "label": "Alerta"}},
+    {"type": "wokwi-resistor", "id": "r1", "top": 148, "left": 210, "rotate": 90, "attrs": {"value": "330"}}
+  ],
+  "connections": [
+    ["esp:5V", "us1:VCC", "red", ["h20", "v-30"]],
+    ["esp:5V", "us2:VCC", "red", ["h20", "v-40"]],
+    ["esp:5V", "us3:VCC", "red", ["h20", "v-50"]],
+    ["esp:GND.1", "us1:GND", "black", ["h40", "v-30"]],
+    ["esp:GND.1", "us2:GND", "black", ["h40", "v-40"]],
+    ["esp:GND.1", "us3:GND", "black", ["h40", "v-50"]],
+    ["esp:5", "us1:TRIG", "green", ["h30", "v-30"]],
+    ["esp:19", "us1:ECHO", "orange", ["h50", "v-40"]],
+    ["esp:21", "us2:TRIG", "green", ["h30", "v-30"]],
+    ["esp:22", "us2:ECHO", "orange", ["h50", "v-40"]],
+    ["esp:25", "us3:TRIG", "green", ["h30", "v-30"]],
+    ["esp:26", "us3:ECHO", "orange", ["h50", "v-40"]],
+    ["esp:18", "r1:1", "orange", ["h30"]],
+    ["r1:2", "led:A", "orange", []],
+    ["led:C", "esp:GND.1", "black", ["v20", "h-150"]]
+  ]
+}
